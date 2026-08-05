@@ -1,0 +1,92 @@
+# NasTech Sync — Configuration
+# ─────────────────────────────────────────────────────────────────────────────
+# Secrets (GITHUB_TOKEN, TELEGRAM_BOT_TOKEN, OPENAI_API_KEY) are read from
+# environment variables automatically — never put real tokens in this file.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── Repos ────────────────────────────────────────────────────────────────────
+upstream:
+  url: https://github.com/NousResearch/hermes-agent
+  branch: main
+
+downstream:
+  url: https://github.com/nastechai/NasTech-Agent
+  branch: main
+
+# ── Git identity for synced commits ──────────────────────────────────────────
+git_user_name: NasTech-Agent
+git_user_email: agent@nastechai.com
+github_username: nastechai
+
+# ── Local paths ───────────────────────────────────────────────────────────────
+# work_dir: ~/.nastech-sync/workspace   (default)
+# log_file: ~/.nastech-sync/sync.log    (default)
+
+# ── AI Brain ──────────────────────────────────────────────────────────────────
+# OpenAI / Codex — set OPENAI_API_KEY via `python -m nastech_sync login`
+openai_model: gpt-4o
+
+# Ollama — CLOUD endpoint (not local). Deploy Ollama on Fly.io, Render, or any
+# server and set the URL here. Leave as-is to disable cloud Ollama.
+# Example: https://my-ollama.fly.dev
+ollama_url: ""
+ollama_model: llama3
+
+# ── Telegram Bot ──────────────────────────────────────────────────────────────
+# Set TELEGRAM_BOT_TOKEN env var (from @BotFather)
+# Set TELEGRAM_CHAT_IDS env var to comma-separated chat IDs that can control the bot
+# Leave empty to allow all chats (not recommended for production)
+# telegram_chat_ids: "123456789,987654321"
+
+# ── Extra branding rules ──────────────────────────────────────────────────────
+# These are appended AFTER built-in defaults.
+# Add here if upstream introduces new names you want to rebrand.
+extra_branding_rules: []
+# Example:
+# extra_branding_rules:
+#   - find: "NewUpstreamName"
+#     replace: "NasTech"
+#   - find: "old-package"
+#     replace: "nastech-package"
+#     case_sensitive: false
+
+# ── File handling ─────────────────────────────────────────────────────────────
+text_extensions:
+  - ".py"
+  - ".md"
+  - ".txt"
+  - ".yaml"
+  - ".yml"
+  - ".json"
+  - ".toml"
+  - ".cfg"
+  - ".ini"
+  - ".sh"
+  - ".bash"
+  - ".rst"
+  - ".html"
+  - ".js"
+  - ".ts"
+  - ".tsx"
+  - ".jsx"
+  - ".css"
+  - ".env"
+  - ".example"
+  - "Dockerfile"
+  - ".dockerfile"
+  - "Makefile"
+  - ".mk"
+  - ".gitignore"
+  - ".gitattributes"
+  - "LICENSE"
+  - "NOTICE"
+
+exclude_patterns:
+  - ".git"
+  - "__pycache__"
+  - "*.pyc"
+  - "*.pyo"
+  - ".DS_Store"
+  - "node_modules"
+  - ".venv"
+  - "venv"

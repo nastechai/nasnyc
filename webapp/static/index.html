@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>NasTech Sync Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/highlight.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github-dark.min.css" />
+<style>
+  :root {
+    --bg: #0d0f14;
+    --surface: #161a22;
+    --surface2: #1e2330;
+    --border: #2a3040;
+    --accent: #00e5ff;
+    --accent2: #7c3aed;
+    --green: #00d68f;
+    --red: #ff4757;
+    --yellow: #ffd32a;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --font: 'Inter', system-ui, -apple-system, sans-serif;
+    --mono: 'JetBrains Mono', 'Fira Code', monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: var(--font); min-height: 100vh; }
+
+  /* Layout */
+  .layout { display: grid; grid-template-columns: 260px 1fr; min-height: 100vh; }
+  .sidebar { background: var(--surface); border-right: 1px solid var(--border); padding: 0; display: flex; flex-direction: column; }
+  .main { padding: 0; overflow: hidden; display: flex; flex-direction: column; }
+
+  /* Sidebar */
+  .logo { padding: 24px 20px 16px; border-bottom: 1px solid var(--border); }
+  .logo-title { font-size: 18px; font-weight: 700; color: var(--accent); letter-spacing: -0.3px; }
+  .logo-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .nav { padding: 12px 8px; flex: 1; }
+  .nav-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 8px; cursor: pointer; font-size: 14px; color: var(--muted); transition: all 0.15s; margin-bottom: 2px; border: none; background: none; width: 100%; text-align: left; }
+  .nav-item:hover { background: var(--surface2); color: var(--text); }
+  .nav-item.active { background: rgba(0,229,255,0.08); color: var(--accent); }
+  .nav-item .icon { font-size: 16px; width: 20px; text-align: center; }
+
+  /* Status pill */
+  .status-pill { margin: 0 12px 16px; padding: 12px; background: var(--surface2); border-radius: 10px; border: 1px solid var(--border); }
+  .status-pill .label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 6px; }
+  .status-row { display: flex; align-items: center; gap: 6px; font-size: 13px; margin-bottom: 4px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .dot.green { background: var(--green); box-shadow: 0 0 8px var(--green); }
+  .dot.yellow { background: var(--yellow); }
+  .dot.red { background: var(--red); }
+
+  /* Header */
+  .header { padding: 20px 28px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; background: var(--surface); }
+  .header h1 { font-size: 20px; font-weight: 600; }
+  .header-actions { display: flex; gap: 10px; }
+
+  /* Content */
+  .content { padding: 24px 28px; overflow-y: auto; flex: 1; }
+
+  /* Tabs/Panels */
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  /* Cards */
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 16px; }
+  .card-title { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; color: var(--muted); margin-bottom: 14px; }
+
+  /* Stats grid */
+  .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 20px; }
+  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 18px; }
+  .stat-value { font-size: 28px; font-weight: 700; color: var(--accent); font-family: var(--mono); }
+  .stat-label { font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+  /* Buttons */
+  .btn { padding: 9px 18px; border-radius: 8px; border: none; cursor: pointer; font-size: 14px; font-weight: 500; transition: all 0.15s; display: inline-flex; align-items: center; gap: 7px; }
+  .btn-primary { background: var(--accent); color: #000; }
+  .btn-primary:hover { background: #00c4dd; }
+  .btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+  .btn-secondary:hover { background: var(--border); }
+  .btn-danger { background: rgba(255,71,87,0.12); color: var(--red); border: 1px solid rgba(255,71,87,0.3); }
+  .btn-danger:hover { background: rgba(255,71,87,0.2); }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* Tables */
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; padding: 10px 12px; color: var(--muted); font-weight: 500; border-bottom: 1px solid var(--border); font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; }
+  td { padding: 11px 12px; border-bottom: 1px solid rgba(42,48,64,0.5); }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+
+  /* Tags */
+  .tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 500; }
+  .tag-green { background: rgba(0,214,143,0.12); color: var(--green); }
+  .tag-yellow { background: rgba(255,211,42,0.12); color: var(--yellow); }
+  .tag-red { background: rgba(255,71,87,0.12); color: var(--red); }
+  .tag-blue { background: rgba(0,229,255,0.1); color: var(--accent); }
+
+  /* Code */
+  code { font-family: var(--mono); font-size: 12px; background: var(--surface2); padding: 2px 6px; border-radius: 4px; color: var(--accent); }
+  pre { background: var(--surface2) !important; border-radius: 8px; padding: 16px; overflow-x: auto; font-size: 13px; border: 1px solid var(--border); }
+
+  /* AI Chat */
+  .chat-container { display: flex; flex-direction: column; height: calc(100vh - 200px); }
+  .chat-messages { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 16px; }
+  .msg { display: flex; gap: 12px; max-width: 800px; }
+  .msg.user { flex-direction: row-reverse; margin-left: auto; }
+  .msg-avatar { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; }
+  .msg.user .msg-avatar { background: var(--accent2); }
+  .msg.bot .msg-avatar { background: rgba(0,229,255,0.15); }
+  .msg-bubble { padding: 12px 16px; border-radius: 12px; font-size: 14px; line-height: 1.6; max-width: 600px; }
+  .msg.user .msg-bubble { background: var(--accent2); color: #fff; }
+  .msg.bot .msg-bubble { background: var(--surface2); border: 1px solid var(--border); }
+  .msg.bot .msg-bubble p { margin: 0 0 8px; } .msg.bot .msg-bubble p:last-child { margin-bottom: 0; }
+  .msg.bot .msg-bubble h1,.msg.bot .msg-bubble h2,.msg.bot .msg-bubble h3 { margin: 12px 0 6px; color: var(--accent); }
+  .msg.bot .msg-bubble ul,.msg.bot .msg-bubble ol { padding-left: 20px; margin: 6px 0; }
+  .chat-input-row { display: flex; gap: 10px; padding: 16px; border-top: 1px solid var(--border); background: var(--surface); }
+  .chat-input { flex: 1; background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 12px 16px; color: var(--text); font-size: 14px; resize: none; font-family: var(--font); outline: none; }
+  .chat-input:focus { border-color: var(--accent); }
+
+  /* Markdown preview */
+  .md-editor { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; height: calc(100vh - 260px); }
+  .md-editor textarea { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 16px; color: var(--text); font-family: var(--mono); font-size: 14px; resize: none; outline: none; }
+  .md-editor textarea:focus { border-color: var(--accent); }
+  .md-preview { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px; overflow-y: auto; line-height: 1.7; }
+  .md-preview h1 { font-size: 24px; margin-bottom: 12px; color: var(--accent); }
+  .md-preview h2 { font-size: 19px; margin: 20px 0 10px; }
+  .md-preview h3 { font-size: 16px; margin: 16px 0 8px; }
+  .md-preview p { margin-bottom: 12px; }
+  .md-preview ul,.md-preview ol { padding-left: 24px; margin-bottom: 12px; }
+  .md-preview li { margin-bottom: 4px; }
+  .md-preview table { margin-bottom: 16px; }
+  .md-preview th,.md-preview td { border: 1px solid var(--border); }
+  .md-preview blockquote { border-left: 3px solid var(--accent); padding-left: 16px; color: var(--muted); margin: 12px 0; }
+
+  /* Brand preview */
+  .brand-input-row { display: flex; gap: 10px; margin-bottom: 16px; }
+  .brand-input { flex: 1; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; color: var(--text); font-size: 14px; outline: none; font-family: var(--mono); }
+  .brand-input:focus { border-color: var(--accent); }
+  .brand-result { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
+  .brand-row { display: flex; gap: 12px; margin-bottom: 10px; align-items: flex-start; }
+  .brand-label { font-size: 11px; font-weight: 600; text-transform: uppercase; color: var(--muted); min-width: 70px; padding-top: 2px; }
+  .brand-text { font-family: var(--mono); font-size: 14px; word-break: break-all; }
+
+  /* History list */
+  .history-item { padding: 14px; background: var(--surface2); border-radius: 8px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
+  .history-meta { font-size: 12px; color: var(--muted); margin-top: 3px; }
+
+  /* Upstream info */
+  .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .info-item { background: var(--surface2); border-radius: 8px; padding: 14px; }
+  .info-key { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 4px; }
+  .info-val { font-size: 14px; }
+
+  /* Spinner */
+  .spin { display: inline-block; width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.2); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.6s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  @media (max-width: 768px) {
+    .layout { grid-template-columns: 1fr; }
+    .sidebar { display: none; }
+    .stats-grid { grid-template-columns: 1fr 1fr; }
+    .md-editor { grid-template-columns: 1fr; }
+    .info-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="logo">
+      <div class="logo-title">⚡ NasTech Sync</div>
+      <div class="logo-sub">Always in sync · Always branded</div>
+    </div>
+    <nav class="nav">
+      <button class="nav-item active" onclick="showPanel('dashboard')"><span class="icon">📊</span> Dashboard</button>
+      <button class="nav-item" onclick="showPanel('history')"><span class="icon">🕐</span> Sync History</button>
+      <button class="nav-item" onclick="showPanel('brain')"><span class="icon">🧠</span> AI Brain</button>
+      <button class="nav-item" onclick="showPanel('markdown')"><span class="icon">📝</span> Markdown</button>
+      <button class="nav-item" onclick="showPanel('branding')"><span class="icon">🎨</span> Brand Tools</button>
+      <button class="nav-item" onclick="showPanel('rules')"><span class="icon">📋</span> Branding Rules</button>
+      <button class="nav-item" onclick="showPanel('info')"><span class="icon">🔍</span> Upstream Info</button>
+    </nav>
+    <div class="status-pill" id="sidebar-status">
+      <div class="label">System Status</div>
+      <div class="status-row"><div class="dot green"></div><span>Sync daemon active</span></div>
+      <div class="status-row" id="brain-status-row"><div class="dot yellow"></div><span id="brain-status-text">Checking brain...</span></div>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <div class="main">
+    <div class="header">
+      <h1 id="panel-title">Dashboard</h1>
+      <div class="header-actions">
+        <button class="btn btn-secondary" onclick="refreshStatus()">🔄 Refresh</button>
+        <button class="btn btn-primary" id="sync-btn" onclick="triggerSync()">⚡ Sync Now</button>
+      </div>
+    </div>
+
+    <div class="content">
+
+      <!-- Dashboard -->
+      <div class="panel active" id="panel-dashboard">
+        <div class="stats-grid" id="stats-grid">
+          <div class="stat-card"><div class="stat-value" id="stat-commits">—</div><div class="stat-label">Commits synced (total)</div></div>
+          <div class="stat-card"><div class="stat-value" id="stat-uptime">—</div><div class="stat-label">Uptime</div></div>
+          <div class="stat-card"><div class="stat-value" id="stat-next">—</div><div class="stat-label">Next sync in</div></div>
+          <div class="stat-card"><div class="stat-value" id="stat-files">—</div><div class="stat-label">Files branded (last sync)</div></div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Sync State</div>
+          <div class="info-grid">
+            <div class="info-item"><div class="info-key">Upstream Repo</div><div class="info-val"><a href="https://github.com/NousResearch/hermes-agent" target="_blank" style="color:var(--accent)">NousResearch/hermes-agent</a></div></div>
+            <div class="info-item"><div class="info-key">Downstream Repo</div><div class="info-val"><a href="https://github.com/nastechai/NasTech-Agent" target="_blank" style="color:var(--accent)">nastechai/NasTech-Agent</a></div></div>
+            <div class="info-item"><div class="info-key">Upstream HEAD</div><div class="info-val"><code id="upstream-head">—</code></div></div>
+            <div class="info-item"><div class="info-key">Downstream HEAD</div><div class="info-val"><code id="downstream-head">—</code></div></div>
+            <div class="info-item"><div class="info-key">Last Synced SHA</div><div class="info-val"><code id="last-sha">—</code></div></div>
+            <div class="info-item"><div class="info-key">Last Sync Time</div><div class="info-val" id="last-time">—</div></div>
+          </div>
+          <div style="margin-top:14px" id="sync-status-msg"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Recent Syncs</div>
+          <div id="recent-syncs"><div style="color:var(--muted);font-size:14px">No syncs recorded yet.</div></div>
+        </div>
+      </div>
+
+      <!-- History -->
+      <div class="panel" id="panel-history">
+        <div class="card">
+          <div class="card-title">Full Sync History</div>
+          <div id="history-list"><div style="color:var(--muted);font-size:14px">No syncs recorded yet.</div></div>
+        </div>
+      </div>
+
+      <!-- AI Brain -->
+      <div class="panel" id="panel-brain">
+        <div class="chat-container">
+          <div class="chat-messages" id="chat-messages">
+            <div class="msg bot">
+              <div class="msg-avatar">🤖</div>
+              <div class="msg-bubble">
+                <strong>NasTech Brain ready.</strong><br>
+                I know everything about NasTech-Agent, its upstream source (NousResearch/hermes-agent), branding rules, sync state, and AI model architecture.<br><br>
+                Ask me anything — about commits, diffs, branding, Hermes model capabilities, or NasTech strategy.
+              </div>
+            </div>
+          </div>
+          <div class="chat-input-row">
+            <textarea class="chat-input" id="chat-input" rows="2" placeholder="Ask the NasTech Brain anything... (Enter to send, Shift+Enter for newline)"></textarea>
+            <button class="btn btn-primary" onclick="sendChat()">Send ↵</button>
+            <button class="btn btn-secondary" onclick="clearChat()" title="Clear history">🗑</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Markdown -->
+      <div class="panel" id="panel-markdown">
+        <div style="margin-bottom:14px;display:flex;align-items:center;gap:10px">
+          <span style="font-size:14px;color:var(--muted)">Write Markdown on the left, see rendered output on the right.</span>
+        </div>
+        <div class="md-editor">
+          <textarea id="md-input" placeholder="# Your Markdown here
+
+Start typing...
+
+## Features
+- **Bold**, *italic*, `code`
+- Tables, task lists, footnotes
+- Fenced code blocks
+
+```python
+print('NasTech-Agent')
+```" oninput="renderMarkdown()"></textarea>
+          <div class="md-preview" id="md-preview"><em style="color:var(--muted)">Preview will appear here...</em></div>
+        </div>
+      </div>
+
+      <!-- Brand Tools -->
+      <div class="panel" id="panel-branding">
+        <div class="card">
+          <div class="card-title">Live Brand Preview</div>
+          <p style="font-size:13px;color:var(--muted);margin-bottom:14px">Type any text containing Hermes / NousResearch references and see how NasTech branding is applied.</p>
+          <div class="brand-input-row">
+            <input class="brand-input" id="brand-input" type="text" placeholder="hermes-agent by NousResearch — a Hermes model" oninput="previewBranding()" />
+          </div>
+          <div class="brand-result" id="brand-result" style="display:none">
+            <div class="brand-row">
+              <div class="brand-label">Original</div>
+              <div class="brand-text" id="brand-original" style="color:var(--muted)"></div>
+            </div>
+            <div class="brand-row">
+              <div class="brand-label">Branded</div>
+              <div class="brand-text" id="brand-branded" style="color:var(--green)"></div>
+            </div>
+            <div id="brand-changes" style="margin-top:10px;font-size:12px;color:var(--muted)"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">What NasTech Sync Knows About Hermes/Nous</div>
+          <div id="upstream-info-content" style="font-size:14px;line-height:1.7;color:var(--muted)">Loading...</div>
+        </div>
+      </div>
+
+      <!-- Branding Rules -->
+      <div class="panel" id="panel-rules">
+        <div class="card">
+          <div class="card-title">Active Branding Rules <span id="rules-count" class="tag tag-blue" style="margin-left:6px"></span></div>
+          <table id="rules-table">
+            <thead><tr><th>#</th><th>Find</th><th>Replace With</th><th>Case</th></tr></thead>
+            <tbody id="rules-body"><tr><td colspan="4" style="color:var(--muted)">Loading...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Upstream Info -->
+      <div class="panel" id="panel-info">
+        <div id="info-content">Loading...</div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── State ────────────────────────────────────────────────────────────
+let totalBranded = 0;
+
+// ─── Navigation ───────────────────────────────────────────────────────
+const titles = {
+  dashboard: 'Dashboard', history: 'Sync History', brain: 'AI Brain',
+  markdown: 'Markdown Editor', branding: 'Brand Tools', rules: 'Branding Rules', info: 'Upstream Info'
+};
+function showPanel(id) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('panel-' + id).classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  event.currentTarget.classList.add('active');
+  document.getElementById('panel-title').textContent = titles[id];
+  if (id === 'rules') loadRules();
+  if (id === 'info') loadUpstreamInfo();
+  if (id === 'history') renderFullHistory();
+}
+
+// ─── Status ───────────────────────────────────────────────────────────
+let syncHistory = [];
+
+async function refreshStatus() {
+  try {
+    const r = await fetch('/api/status');
+    const d = await r.json();
+
+    document.getElementById('upstream-head').textContent = (d.upstream_head || '—').substring(0, 12);
+    document.getElementById('downstream-head').textContent = (d.downstream_head || '—').substring(0, 12);
+    document.getElementById('last-sha').textContent = (d.last_synced_upstream_sha || 'never').substring(0, 12);
+    document.getElementById('last-time').textContent = d.last_sync_time ? new Date(d.last_sync_time).toLocaleString() : 'never';
+
+    const uptime = d.uptime_seconds || 0;
+    document.getElementById('stat-uptime').textContent = formatDuration(uptime);
+    document.getElementById('stat-next').textContent = d.next_sync_in ? formatDuration(d.next_sync_in) : '—';
+
+    syncHistory = d.recent_syncs || [];
+    const totalCommits = syncHistory.reduce((a, s) => a + (s.commits_synced || 0), 0);
+    totalBranded = syncHistory.reduce((a, s) => a + (s.files_branded || 0), 0);
+    document.getElementById('stat-commits').textContent = totalCommits;
+    document.getElementById('stat-files').textContent = totalBranded;
+
+    const upToDate = d.last_synced_upstream_sha && d.upstream_head && d.last_synced_upstream_sha === d.upstream_head;
+    const statusMsg = document.getElementById('sync-status-msg');
+    statusMsg.innerHTML = upToDate
+      ? '<span class="tag tag-green">✅ Up to date with upstream</span>'
+      : '<span class="tag tag-yellow">🔄 New upstream commits available</span>';
+
+    renderRecentSyncs();
+  } catch (e) { console.error(e); }
+  await refreshBrainStatus();
+}
+
+async function refreshBrainStatus() {
+  try {
+    const r = await fetch('/api/brain');
+    const d = await r.json();
+    const ok = d.any_available;
+    const dot = document.querySelector('#sidebar-status .dot:last-child') || document.createElement('div');
+    const text = document.getElementById('brain-status-text');
+    const row = document.getElementById('brain-status-row');
+    row.querySelector('.dot').className = 'dot ' + (ok ? 'green' : 'red');
+    const active = Object.entries(d.providers || {}).filter(([,v]) => v).map(([k]) => k);
+    text.textContent = ok ? 'Brain: ' + active.join(', ') : 'No AI provider';
+  } catch(e) {}
+}
+
+function renderRecentSyncs() {
+  const el = document.getElementById('recent-syncs');
+  if (!syncHistory.length) { el.innerHTML = '<div style="color:var(--muted);font-size:14px">No syncs yet.</div>'; return; }
+  el.innerHTML = syncHistory.slice().reverse().slice(0, 5).map(s => `
+    <div class="history-item">
+      <div>
+        <div style="font-size:14px;font-weight:500">${s.commits_synced} commits · ${s.files_branded} files branded</div>
+        <div class="history-meta">${s.started_at ? new Date(s.started_at).toLocaleString() : ''}</div>
+      </div>
+      <span class="tag ${s.errors?.length ? 'tag-red' : 'tag-green'}">${s.errors?.length ? '⚠ ' + s.errors.length + ' errors' : '✅ OK'}</span>
+    </div>`).join('');
+}
+
+function renderFullHistory() {
+  const el = document.getElementById('history-list');
+  if (!syncHistory.length) { el.innerHTML = '<div style="color:var(--muted);font-size:14px">No syncs yet.</div>'; return; }
+  el.innerHTML = syncHistory.slice().reverse().map((s, i) => `
+    <div class="history-item">
+      <div>
+        <div style="font-size:14px;font-weight:500">#${syncHistory.length - i} — ${s.commits_synced} commits · ${s.files_branded} branded · ${s.files_copied} copied</div>
+        <div class="history-meta">${s.started_at ? new Date(s.started_at).toLocaleString() : ''} → ${s.finished_at ? new Date(s.finished_at).toLocaleString() : ''}</div>
+        ${s.errors?.length ? `<div class="history-meta" style="color:var(--red)">Errors: ${s.errors.join(', ')}</div>` : ''}
+      </div>
+      <span class="tag ${s.errors?.length ? 'tag-red' : 'tag-green'}">${s.errors?.length ? '⚠ errors' : '✅'}</span>
+    </div>`).join('');
+}
+
+// ─── Sync trigger ─────────────────────────────────────────────────────
+async function triggerSync() {
+  const btn = document.getElementById('sync-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin"></span> Syncing...';
+  try {
+    await fetch('/api/sync', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({}) });
+    setTimeout(refreshStatus, 2000);
+    setTimeout(refreshStatus, 8000);
+  } finally {
+    setTimeout(() => { btn.disabled = false; btn.innerHTML = '⚡ Sync Now'; }, 5000);
+  }
+}
+
+// ─── Rules ────────────────────────────────────────────────────────────
+async function loadRules() {
+  const r = await fetch('/api/rules');
+  const d = await r.json();
+  document.getElementById('rules-count').textContent = d.count;
+  document.getElementById('rules-body').innerHTML = d.rules.map((rule, i) => `
+    <tr>
+      <td style="color:var(--muted)">${i+1}</td>
+      <td><code style="color:var(--red)">${rule.find}</code></td>
+      <td><code style="color:var(--green)">${rule.replace}</code></td>
+      <td><span class="tag ${rule.case_sensitive ? 'tag-blue' : 'tag-yellow'}">${rule.case_sensitive ? 'exact' : 'insensitive'}</span></td>
+    </tr>`).join('');
+}
+
+// ─── Upstream Info ────────────────────────────────────────────────────
+async function loadUpstreamInfo() {
+  const r = await fetch('/api/upstream-info');
+  const d = await r.json();
+  const up = d.upstream; const down = d.downstream;
+  document.getElementById('info-content').innerHTML = `
+    <div style="display:grid;gap:16px">
+      <div class="card">
+        <div class="card-title">📡 Upstream — NousResearch/hermes-agent</div>
+        <div class="info-grid">
+          <div class="info-item"><div class="info-key">Organisation</div><div class="info-val">${up.org}</div></div>
+          <div class="info-item"><div class="info-key">Repository</div><div class="info-val"><a href="${up.url}" target="_blank" style="color:var(--accent)">${up.repo}</a></div></div>
+          <div class="info-item"><div class="info-key">Model Family</div><div class="info-val">${up.model_family}</div></div>
+          <div class="info-item"><div class="info-key">Description</div><div class="info-val" style="color:var(--muted);font-size:13px">${up.description}</div></div>
+        </div>
+        <div style="margin-top:14px"><div class="card-title" style="margin-bottom:8px">Specialties</div>
+          ${up.specialties.map(s => `<span class="tag tag-blue" style="margin:3px">${s}</span>`).join('')}
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">🚀 Downstream — nastechai/NasTech-Agent</div>
+        <div class="info-grid">
+          <div class="info-item"><div class="info-key">Organisation</div><div class="info-val">${down.org}</div></div>
+          <div class="info-item"><div class="info-key">Repository</div><div class="info-val"><a href="${down.url}" target="_blank" style="color:var(--accent)">${down.repo}</a></div></div>
+          <div class="info-item" style="grid-column:1/-1"><div class="info-key">Description</div><div class="info-val" style="color:var(--muted);font-size:13px">${down.description}</div></div>
+        </div>
+      </div>
+    </div>`;
+  // Also load branding upstream info
+  document.getElementById('upstream-info-content').innerHTML = `<strong>NousResearch</strong> builds the Hermes family of open-weight models — fine-tuned Mistral and Llama variants optimised for tool use, structured output, and agentic reasoning. NasTech-Agent tracks every commit and re-brands all references to NasTech, so your fork is always at parity with the upstream frontier.`;
+}
+
+// ─── Brand Preview ────────────────────────────────────────────────────
+let brandDebounce = null;
+async function previewBranding() {
+  clearTimeout(brandDebounce);
+  brandDebounce = setTimeout(async () => {
+    const text = document.getElementById('brand-input').value;
+    if (!text) { document.getElementById('brand-result').style.display = 'none'; return; }
+    const r = await fetch('/api/brand-preview?text=' + encodeURIComponent(text));
+    const d = await r.json();
+    document.getElementById('brand-result').style.display = 'block';
+    document.getElementById('brand-original').textContent = d.original;
+    document.getElementById('brand-branded').textContent = d.branded;
+    document.getElementById('brand-changes').innerHTML = d.changes.join('<br>') || '<em>No changes — text has no Hermes/Nous references.</em>';
+  }, 150);
+}
+
+// ─── Markdown ─────────────────────────────────────────────────────────
+function renderMarkdown() {
+  const text = document.getElementById('md-input').value;
+  const html = marked.parse(text, { breaks: true });
+  document.getElementById('md-preview').innerHTML = html;
+  document.querySelectorAll('#md-preview pre code').forEach(el => hljs.highlightElement(el));
+}
+
+// ─── AI Chat ─────────────────────────────────────────────────────────
+const chatMessages = [];
+async function sendChat() {
+  const input = document.getElementById('chat-input');
+  const q = input.value.trim();
+  if (!q) return;
+  input.value = '';
+
+  appendMsg('user', q);
+  const botMsg = appendMsg('bot', '<span class="spin"></span>');
+
+  try {
+    const resp = await fetch('/api/ask', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ question: q, stream: true })
+    });
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let full = '';
+    botMsg.querySelector('.msg-bubble').innerHTML = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      const lines = decoder.decode(value).split('\n');
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          const data = line.slice(6).trim();
+          if (data === '[DONE]') break;
+          try { full += JSON.parse(data).chunk; } catch(e) {}
+        }
+      }
+      botMsg.querySelector('.msg-bubble').innerHTML = marked.parse(full);
+    }
+  } catch(e) {
+    botMsg.querySelector('.msg-bubble').textContent = '❌ Error: ' + e.message;
+  }
+
+  document.getElementById('chat-messages').scrollTop = 99999;
+}
+
+function appendMsg(role, html) {
+  const msgs = document.getElementById('chat-messages');
+  const div = document.createElement('div');
+  div.className = 'msg ' + role;
+  div.innerHTML = `<div class="msg-avatar">${role === 'user' ? '👤' : '🤖'}</div><div class="msg-bubble">${role === 'bot' ? html : escapeHtml(html)}</div>`;
+  msgs.appendChild(div);
+  msgs.scrollTop = 99999;
+  return div;
+}
+
+async function clearChat() {
+  await fetch('/api/ask', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({question:'[CLEAR]'}) }).catch(()=>{});
+  document.getElementById('chat-messages').innerHTML = `<div class="msg bot"><div class="msg-avatar">🤖</div><div class="msg-bubble">History cleared. Ask me anything.</div></div>`;
+}
+
+document.getElementById('chat-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat(); }
+});
+
+function escapeHtml(t) { return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// ─── Utils ────────────────────────────────────────────────────────────
+function formatDuration(s) {
+  if (s < 60) return Math.round(s) + 's';
+  if (s < 3600) return Math.round(s/60) + 'm';
+  return Math.round(s/3600) + 'h ' + Math.round((s%3600)/60) + 'm';
+}
+
+// ─── Init ─────────────────────────────────────────────────────────────
+refreshStatus();
+setInterval(refreshStatus, 15000);
+</script>
+</body>
+</html>
