@@ -1,0 +1,198 @@
+name: NasTech PR Bot
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+  issue_comment:
+    types: [created]
+
+jobs:
+  # ── Auto-label NasTech sync PRs ────────────────────────────────────────────
+  label-sync-pr:
+    name: Auto-label sync PRs
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    permissions:
+      pull-requests: write
+      contents: read
+
+    steps:
+      - name: Label NasTech sync branch PRs
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const branch = context.payload.pull_request.head.ref;
+            const title  = context.payload.pull_request.title;
+            const labels = [];
+
+            if (branch.startsWith('nastech-sync/')) {
+              labels.push('auto-sync', 'nastech-branded');
+            }
+            if (title.toLowerCase().includes('upstream')) {
+              labels.push('upstream-change');
+            }
+            if (title.toLowerCase().includes('fix')) {
+              labels.push('bug-fix');
+            }
+            if (title.toLowerCase().includes('feat') || title.toLowerCase().includes('add')) {
+              labels.push('enhancement');
+            }
+
+            // Ensure labels exist before applying
+            for (const label of labels) {
+              try {
+                await github.rest.issues.getLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  name: label
+                });
+              } catch {
+                // Create the label if it doesn't exist
+                const colors = {
+                  'auto-sync': '0075ca',
+                  'nastech-branded': '7057ff',
+                  'upstream-change': 'e4e669',
+                  'bug-fix': 'd73a4a',
+                  'enhancement': 'a2eeef',
+                };
+                await github.rest.issues.createLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  name: label,
+                  color: colors[label] || 'ededed'
+                }).catch(() => {});
+              }
+            }
+
+            if (labels.length > 0) {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.pull_request.number,
+                labels: labels
+              });
+            }
+
+      - name: Comment on new sync PR
+        if: github.event.action == 'opened'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const branch = context.payload.pull_request.head.ref;
+            if (!branch.startsWith('nastech-sync/')) return;
+
+            const body = [
+              '## 🤖 NasTech Sync Bot',
+              '',
+              'This PR was automatically created by **NasTech Sync** (`nasnyc`).',
+              '',
+              '### What this PR does',
+              '- Pulls latest commits from `NousResearch/hermes-agent` (upstream)',
+              '- Applies NasTech branding to all text content',
+              '- Commits with message: `NasTech Updates from Source End: ...`',
+              '',
+              '### Review checklist',
+              '- [ ] Branding looks correct (no `Hermes`/`NousResearch` leaking through)',
+              '- [ ] No NasTech-specific customizations were overwritten',
+              '- [ ] Tests pass (check the Actions tab)',
+              '',
+              '### Bot commands',
+              '> Comment on this PR to trigger bot actions:',
+              '',
+              '| Command | Action |',
+              '|---------|--------|',
+              '| `/approve` | Approve and auto-merge this PR |',
+              '| `/close` | Close this PR without merging |',
+              '| `/retry-sync` | Re-run the branding step |',
+              '| `/check-branding` | Run a branding audit on this PR |',
+              '',
+              `_Branch: \`${branch}\`_`,
+            ].join('\n');
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              body: body
+            });
+
+  # ── Handle bot commands in PR comments ────────────────────────────────────
+  bot-commands:
+    name: Handle bot commands
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'issue_comment' &&
+      github.event.issue.pull_request &&
+      startsWith(github.event.comment.body, '/')
+    permissions:
+      pull-requests: write
+      contents: write
+
+    steps:
+      - name: Parse and handle command
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const comment = context.payload.comment.body.trim();
+            const pr_number = context.payload.issue.number;
+            const actor = context.payload.comment.user.login;
+
+            // Check actor has write access (basic check: org member or collaborator)
+            let hasAccess = false;
+            try {
+              const { data } = await github.rest.repos.getCollaboratorPermissionLevel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                username: actor
+              });
+              hasAccess = ['admin', 'write', 'maintain'].includes(data.permission);
+            } catch { hasAccess = false; }
+
+            if (!hasAccess) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pr_number,
+                body: `@${actor} ⛔ You need write access to use bot commands.`
+              });
+              return;
+            }
+
+            const reply = async (msg) => github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: pr_number,
+              body: msg
+            });
+
+            if (comment === '/approve') {
+              await github.rest.pulls.createReview({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: pr_number,
+                event: 'APPROVE',
+                body: '✅ Approved by NasTech Bot on behalf of ' + actor
+              });
+              await reply('✅ PR approved by `' + actor + '` via bot command.');
+
+            } else if (comment === '/close') {
+              await github.rest.pulls.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: pr_number,
+                state: 'closed'
+              });
+              await reply('🚫 PR closed by `' + actor + '` via bot command.');
+
+            } else if (comment === '/check-branding') {
+              await reply(
+                '🔍 **Branding check requested** — run `python -m nastech_sync preview <text>` locally to test rules.\n\n' +
+                'The CI `branding-check` job also runs on every push and validates URL order-safety automatically.'
+              );
+
+            } else if (comment === '/retry-sync') {
+              await reply('🔄 To retry the sync, re-run the workflow from the Actions tab or push a new commit.');
+
+            } else {
+              await reply(`❓ Unknown command: \`${comment}\`\n\nAvailable: \`/approve\`, \`/close\`, \`/check-branding\`, \`/retry-sync\``);
+            }

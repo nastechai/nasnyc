@@ -11,6 +11,7 @@ Usage examples:
 """
 
 import sys
+import asyncio
 import logging
 import argparse
 from pathlib import Path
@@ -246,6 +247,140 @@ def cmd_test(args, config) -> int:
     return 1 if result.errors else 0
 
 
+def cmd_deps(args, config) -> int:
+    """Scan all dependency manifests for outdated packages."""
+    from .dependency_scanner import DependencyScanner
+
+    scan_path = args.scan_path or "."
+    fmt = getattr(args, "format", "table")
+
+    print(f"\n🔍  Scanning dependencies in: {scan_path}")
+
+    async def _run():
+        scanner = DependencyScanner(root_path=scan_path)
+        return await scanner.scan()
+
+    report = asyncio.run(_run())
+
+    if fmt == "json":
+        import json
+        out = {
+            "root": report.root_path,
+            "total": len(report.packages),
+            "outdated": [
+                {
+                    "name": p.name,
+                    "ecosystem": p.ecosystem,
+                    "current": p.current_version,
+                    "latest": p.latest_version,
+                    "manifest": p.manifest_file,
+                    "url": p.latest_url,
+                }
+                for p in report.outdated()
+            ],
+            "up_to_date": len(report.up_to_date()),
+            "errors": report.errors,
+        }
+        print(json.dumps(out, indent=2))
+    elif fmt == "markdown":
+        print(report.markdown_report())
+    else:
+        # Table view
+        by_eco = report.by_ecosystem()
+        for eco, pkgs in sorted(by_eco.items()):
+            print(f"\n── {eco.upper()} ({'  '.join(p.manifest_file.split('/')[-1:])}) ──")
+            for p in sorted(pkgs, key=lambda x: (not x.is_outdated, x.name)):
+                print(f"  {p}")
+
+    print(f"\n{report.summary()}")
+    if report.outdated():
+        print("  Run `nastech-sync update` to apply all updates.")
+    return 0
+
+
+def cmd_update(args, config) -> int:
+    """Apply dependency updates across all ecosystems."""
+    from .dependency_scanner import DependencyScanner
+    from .dependency_updater import DependencyUpdater
+
+    scan_path = args.scan_path or "."
+    dry_run = getattr(args, "dry_run", False)
+    ecosystems = getattr(args, "ecosystems", None)
+    eco_list = [e.strip() for e in ecosystems.split(",")] if ecosystems else None
+
+    print(f"\n📦  Scanning dependencies in: {scan_path}")
+
+    async def _scan():
+        return await DependencyScanner(root_path=scan_path).scan()
+
+    report = asyncio.run(_scan())
+    outdated = report.outdated()
+
+    if not outdated:
+        print("✅  All packages are up to date!")
+        return 0
+
+    print(f"  Found {len(outdated)} outdated packages.")
+    if dry_run:
+        print("  (Dry run — no files will be changed)\n")
+
+    updater = DependencyUpdater(root_path=scan_path)
+    changes = updater.apply_updates(report, dry_run=dry_run, ecosystems=eco_list)
+
+    if not changes:
+        print("  No manifest files could be updated automatically.")
+        return 0
+
+    for fpath, file_changes in changes.items():
+        print(f"\n  {fpath}:")
+        for c in file_changes:
+            prefix = "  would update" if dry_run else "  ✅ updated"
+            print(f"    {prefix}: {c}")
+
+    if not dry_run:
+        # Run post-update commands (npm install, go mod tidy, etc.)
+        updated_ecosystems = {p.ecosystem for p in outdated if any(p.name in c for c in sum(changes.values(), []))}
+        if updated_ecosystems:
+            print(f"\n  Running post-update commands for: {', '.join(updated_ecosystems)}")
+            results = updater.run_post_update(updated_ecosystems)
+            for cmd, ok, output in results:
+                icon = "✅" if ok else "⚠️ "
+                print(f"  {icon} {cmd}")
+                if not ok and output:
+                    print(f"     {output[:200]}")
+
+        print(f"\n✅  Updated {sum(len(v) for v in changes.values())} packages across {len(changes)} file(s).")
+        print("  Commit the changes and push to create a PR.")
+    return 0
+
+
+def cmd_brain_connect(args, config) -> int:
+    """Connect this installation to the NasTech Brain — load full project context."""
+    from .awareness import NasTechAwareness
+
+    scan_path = getattr(args, "scan_path", None) or "."
+    verbose = getattr(args, "verbose_output", False)
+
+    print("\n🧠  Connecting to NasTech Brain...")
+    print(f"   Scanning: {scan_path}")
+    print(f"   Brain providers: OpenAI={bool(config.openai_api_key)}, Ollama={bool(config.ollama_url)}\n")
+
+    awareness = NasTechAwareness(config)
+
+    async def _run():
+        return await awareness.connect(scan_path=scan_path, verbose=verbose)
+
+    context = asyncio.run(_run())
+
+    print(f"\n✅  Brain connected.")
+    print(f"   Context saved to: {awareness.context_file}")
+    print(f"   Packages scanned: see context file for full dependency report")
+    print(f"   Branding rules  : {len(config.branding_rules)} rules loaded")
+    print(f"\n   The brain now knows about this NasTech installation.")
+    print(f"   Run `python main.py` to start the 24/7 daemon with full brain awareness.\n")
+    return 0
+
+
 def cmd_prs(args, config) -> int:
     """List open PRs on the downstream repo."""
     if not config.github_token:
@@ -314,6 +449,25 @@ def main(argv=None) -> int:
     # prs
     sub.add_parser("prs", help="List open PRs on the downstream repo")
 
+    # deps — scan all dependency manifests
+    p_deps = sub.add_parser("deps", help="Scan all dependency manifests for outdated packages (npm, pip, cargo, go, …)")
+    p_deps.add_argument("--scan-path", default=".", help="Directory to scan (default: current dir)")
+    p_deps.add_argument("--format", choices=["table", "json", "markdown"], default="table",
+                        help="Output format")
+
+    # update — apply dependency updates
+    p_update = sub.add_parser("update", help="Apply dependency updates across all ecosystems")
+    p_update.add_argument("--scan-path", default=".", help="Directory to scan and update")
+    p_update.add_argument("--dry-run", action="store_true", help="Show what would change without writing")
+    p_update.add_argument("--ecosystems", default=None,
+                          help="Comma-separated list of ecosystems to update (e.g. pip,npm)")
+
+    # brain-connect — connect to NasTech Brain with full awareness
+    p_brain = sub.add_parser("brain-connect",
+                              help="Connect this install to the NasTech Brain — scans deps + loads project context")
+    p_brain.add_argument("--scan-path", default=".", help="Project path to scan for dependencies")
+    p_brain.add_argument("--verbose-output", action="store_true", help="Show full brain context preview")
+
     args = parser.parse_args(argv)
     config = load_config(args.config)
 
@@ -328,6 +482,9 @@ def main(argv=None) -> int:
         "rules": cmd_rules,
         "login": cmd_login,
         "prs": cmd_prs,
+        "deps": cmd_deps,
+        "update": cmd_update,
+        "brain-connect": cmd_brain_connect,
     }
     return dispatch[args.command](args, config)
 

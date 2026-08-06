@@ -56,6 +56,13 @@ class NasTechSyncConfig:
         "Dockerfile", ".dockerfile", "Makefile", ".mk",
         ".gitignore", ".gitattributes", "LICENSE", "NOTICE",
     ])
+    # PR settings
+    pr_draft: bool = False
+    pr_labels: list = field(default_factory=lambda: ["auto-sync", "nastech-branded"])
+    # Dependency check settings
+    dep_check_enabled: bool = True
+    dep_check_ecosystems: list = field(default_factory=list)  # empty = all
+    dep_auto_update: bool = False
     # Files/dirs to never copy from upstream
     exclude_patterns: list = field(default_factory=lambda: [
         ".git", "__pycache__", "*.pyc", "*.pyo",

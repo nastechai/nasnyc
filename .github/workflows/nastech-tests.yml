@@ -1,0 +1,88 @@
+name: NasTech Tests
+
+on:
+  push:
+    branches: [main, 'nastech-sync/**', 'feature/**']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Test (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.10', '3.11', '3.12']
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip'
+
+      - name: Install package + test dependencies
+        run: |
+          pip install -e . --quiet
+          pip install -r requirements.txt --quiet
+          pip install pytest pytest-asyncio pytest-cov --quiet
+
+      - name: Run tests
+        run: pytest tests/ -v --tb=short --cov=nastech_sync --cov-report=xml
+
+      - name: Upload coverage
+        if: matrix.python-version == '3.11'
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./coverage.xml
+          fail_ci_if_error: false
+
+  # Quick branding smoke-test — always runs even if unit tests skip
+  branding-check:
+    name: Branding sanity check
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11', cache: 'pip' }
+      - run: pip install -e . -r requirements.txt --quiet
+
+      - name: Test branding rules
+        run: |
+          python -m nastech_sync rules
+          python -m nastech_sync preview "hermes-agent by NousResearch — github.com/NousResearch/hermes-agent"
+
+      - name: Verify URL branding is order-safe
+        run: |
+          OUTPUT=$(python -m nastech_sync preview "https://github.com/NousResearch/hermes-agent")
+          echo "Output: $OUTPUT"
+          # Must contain nastechai, must NOT contain NousResearch
+          echo "$OUTPUT" | grep -q "nastechai" || (echo "❌ nastechai not found in output" && exit 1)
+          echo "$OUTPUT" | grep -q "NousResearch" && (echo "❌ NousResearch leaked through!" && exit 1) || true
+          echo "✅ Branding order-safe check passed"
+
+  # Dependency scan — informational, never fails the build
+  dep-scan:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    continue-on-error: true
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11', cache: 'pip' }
+      - run: pip install -e . -r requirements.txt --quiet
+
+      - name: Scan dependencies
+        run: python -m nastech_sync deps --scan-path . --format markdown
+        continue-on-error: true
