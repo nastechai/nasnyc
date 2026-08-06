@@ -50,6 +50,18 @@ extra_branding_rules: []
 #     replace: "nastech-package"
 #     case_sensitive: false
 
+# Built-in rules already cover (in order, most-specific first):
+#   github.com/NousResearch/hermes-agent → github.com/nastechai/NasTech-Agent
+#   github.com/NousResearch             → github.com/nastechai
+#   nousresearch/hermes-agent           → nastechai/nastech-agent  (Docker)
+#   hermes-agent / hermes_agent / HermesAgent / hermes-ai / hermes_ai
+#   Nous Portal                         → NasTech Portal
+#   Nous Subscription                   → NasTech Subscription
+#   Nous model                          → NasTech model
+#   NousResearch / Nous Research        → NasTech Research
+#   nous-research / nousresearch        → nastechai  (also covers *.nousresearch.com domains)
+#   HERMES / Hermes / hermes            → NASTECH / NasTech / nastech
+
 # ── File handling ─────────────────────────────────────────────────────────────
 text_extensions:
   - ".py"

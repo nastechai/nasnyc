@@ -106,7 +106,12 @@ def default_branding_rules() -> list[BrandingRule]:
         BrandingRule("hermes-ai", "nastech-ai"),
         BrandingRule("hermes_ai", "nastech_ai"),
 
-        # ── Organisation name variants (before bare brand word) ───────
+        # ── Organisation + product name variants (before bare brand word) ─
+        # "Nous Portal" / "Nous Subscription" / "Nous model" must come
+        # BEFORE "Nous Research" so they are matched as full phrases first.
+        BrandingRule("Nous Portal", "NasTech Portal"),
+        BrandingRule("Nous Subscription", "NasTech Subscription"),
+        BrandingRule("Nous model", "NasTech model"),
         BrandingRule("NousResearch", "NasTech Research"),
         BrandingRule("Nous Research", "NasTech Research"),
         BrandingRule("nous-research", "nastechai"),
