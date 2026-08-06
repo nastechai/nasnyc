@@ -125,18 +125,38 @@ class GitRepo:
         return [line for line in r.stdout.strip().splitlines() if line]
 
     def changed_files(self, from_sha: str, to_sha: str) -> list[tuple[str, str]]:
-        """Return [(status, path)] for files changed between two commits."""
+        """
+        Return [(status, path)] for files changed between two commits.
+
+        Git statuses:
+          A  = Added           → (A, new_path)
+          M  = Modified        → (M, path)
+          D  = Deleted         → (D, path)
+          R<N> = Renamed       → (R, old_path) + (A, new_path)
+          C<N> = Copied        → (A, new_path)  [treat old as unchanged]
+        """
         r = _run(
-            ["git", "diff", "--name-status", from_sha, to_sha],
+            ["git", "diff", "--name-status", "-M", from_sha, to_sha],
             cwd=str(self.path),
         )
         results = []
         for line in r.stdout.strip().splitlines():
             if not line.strip():
                 continue
-            parts = line.split("\t", 1)
-            if len(parts) == 2:
-                results.append((parts[0], parts[1]))
+            parts = line.split("\t")
+            status = parts[0]
+
+            if status.startswith("R") and len(parts) == 3:
+                # Rename: old path deleted, new path added
+                old_path, new_path = parts[1], parts[2]
+                results.append(("D", old_path))
+                results.append(("A", new_path))
+            elif status.startswith("C") and len(parts) == 3:
+                # Copy: new path added (old unchanged)
+                new_path = parts[2]
+                results.append(("A", new_path))
+            elif len(parts) == 2:
+                results.append((status, parts[1]))
         return results
 
     def show_file_at(self, sha: str, rel_path: str, dest: Path) -> bool:

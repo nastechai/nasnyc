@@ -150,7 +150,7 @@ class Syncer:
 
             if dry_run:
                 logger.info("[DRY RUN] Branch '%s' ready. Would push + open PR.", branch_name)
-                self._save_last_synced_sha(upstream_head)
+                # Do NOT save state on dry-run — no real push or PR was made
                 result.finish()
                 return result
 
@@ -169,7 +169,7 @@ class Syncer:
             if pr:
                 result.pr_url = pr.get("html_url")
                 logger.info("PR opened: %s", result.pr_url)
-                self._save_last_synced_sha(upstream_head)
+                self._save_last_synced_sha(upstream_head, pr_url=result.pr_url)
             else:
                 result.errors.append("Could not open PR (no token or API error).")
 
@@ -427,16 +427,18 @@ class Syncer:
             f"- `{c['sha'][:10]}` {self.brander.brand_text(c['subject'])}"
             for c in commits
         )
+        upstream_owner, upstream_repo_name = _parse_owner_repo(self.config.upstream.url)
+        upstream_ref = f"{upstream_owner}/{upstream_repo_name}" if upstream_owner else "upstream source"
         body = (
             f"## NasTech Updates from Source End\n\n"
-            f"Auto-synced {len(commits)} commit(s) from "
-            f"[NousResearch/hermes-agent](https://github.com/NousResearch/hermes-agent)"
+            f"Auto-synced {len(commits)} commit(s) from upstream source"
             f" @ `{upstream_head[:12]}`.\n\n"
             f"NasTech branding applied to all text content.\n\n"
             f"### Commits included\n\n"
             f"{commit_lines}\n\n"
             f"---\n"
-            f"*Opened automatically by NasTech-Agent sync daemon.*"
+            f"*Opened automatically by NasTech-Agent sync daemon.*\n"
+            f"*Source ref: {upstream_ref}*"
         )
 
         pr = api.create_pull_request(

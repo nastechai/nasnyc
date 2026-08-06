@@ -267,13 +267,25 @@ class NasTechBot:
         typing_msg = await update.message.reply_text("🧠 Thinking...")
         try:
             answer = await self.scheduler.brain.ask(question)
-            # Telegram 4096 char limit
-            if len(answer) > 4000:
-                answer = answer[:4000] + "\n\n_\\[truncated\\]_"
             await typing_msg.delete()
-            await update.message.reply_text(answer)
+            # Send in chunks to stay under the 4096 char Telegram limit
+            chunk_size = 4000
+            for i in range(0, max(1, len(answer)), chunk_size):
+                chunk = answer[i:i + chunk_size]
+                if not chunk.strip():
+                    continue
+                # Send as plain text — AI responses can contain arbitrary formatting
+                # that breaks MarkdownV2 parsing unexpectedly.
+                try:
+                    await update.message.reply_text(chunk)
+                except Exception:
+                    # Last resort: strip to ASCII-safe subset
+                    await update.message.reply_text(chunk.encode("ascii", errors="replace").decode())
         except Exception as exc:
-            await typing_msg.edit_text(f"❌ Brain error: {exc}")
+            try:
+                await typing_msg.edit_text(f"❌ Brain error: {exc}")
+            except Exception:
+                await update.message.reply_text(f"❌ Brain error: {exc}")
 
     async def _run_sync_and_notify(self, update: Update, dry_run: bool = False):
         try:
@@ -282,18 +294,23 @@ class NasTechBot:
             )
             mode = "DRY RUN" if dry_run else "LIVE"
             icon = "✅" if not result.errors else "⚠️"
-            text = (
-                f"{icon} *NasTech Sync Complete* \\[{_escape(mode)}\\]\n"
-                f"━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                f"Commits synced: *{result.commits_synced}*\n"
-                f"Files branded: *{result.files_branded}*\n"
-                f"Files copied: *{result.files_copied}*\n"
-            )
+            lines = [
+                f"{icon} NasTech Sync Complete [{mode}]",
+                "━━━━━━━━━━━━━━━━━━━━━━━━━",
+                f"Commits synced: {result.commits_synced}",
+                f"Files branded:  {result.files_branded}",
+                f"Files copied:   {result.files_copied}",
+            ]
+            if result.branch_name:
+                lines.append(f"Branch: {result.branch_name}")
+            if result.pr_url:
+                lines.append(f"PR: {result.pr_url}")
             if result.errors:
-                text += f"\n⚠️ Errors:\n" + "\n".join(f"• {_escape(e)}" for e in result.errors)
-            await update.message.reply_text(text, parse_mode=ParseMode.MARKDOWN_V2)
+                lines.append("\n⚠️ Errors:")
+                lines.extend(f"• {e}" for e in result.errors)
+            await update.message.reply_text("\n".join(lines))
         except Exception as exc:
-            await update.message.reply_text(f"❌ Sync failed: {_escape(str(exc))}", parse_mode=ParseMode.MARKDOWN_V2)
+            await update.message.reply_text(f"❌ Sync failed: {exc}")
 
     # ------------------------------------------------------------------
     # Notification API (called by scheduler)

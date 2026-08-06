@@ -29,8 +29,8 @@ openai_model: gpt-4o
 # Ollama — CLOUD endpoint (not local). Deploy Ollama on Fly.io, Render, or any
 # server and set the URL here. Leave as-is to disable cloud Ollama.
 # Example: https://my-ollama.fly.dev
-ollama_url: ""
-ollama_model: llama3
+ollama_url: "https://api.ollama.com"
+ollama_model: llama3.1
 
 # ── Telegram Bot ──────────────────────────────────────────────────────────────
 # Set TELEGRAM_BOT_TOKEN env var (from @BotFather)

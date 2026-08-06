@@ -41,8 +41,9 @@ class NasTechSyncConfig:
     # AI Brain
     openai_api_key: Optional[str] = None
     openai_model: str = "gpt-4o"
-    ollama_url: str = "http://localhost:11434"
-    ollama_model: str = "llama3"
+    ollama_url: str = "https://api.ollama.com"
+    ollama_model: str = "llama3.1"
+    ollama_api_key: Optional[str] = None  # for api.ollama.com (Bearer auth)
     # Telegram
     telegram_bot_token: Optional[str] = None
     telegram_chat_ids: str = ""   # comma-separated int IDs
@@ -196,8 +197,9 @@ def load_config(config_path: Optional[str] = None) -> NasTechSyncConfig:
         # AI Brain
         openai_api_key=os.environ.get("OPENAI_API_KEY") or raw.get("openai_api_key"),
         openai_model=raw.get("openai_model", "gpt-4o"),
-        ollama_url=os.environ.get("OLLAMA_URL") or raw.get("ollama_url", "http://localhost:11434"),
-        ollama_model=raw.get("ollama_model", "llama3"),
+        ollama_url=os.environ.get("OLLAMA_URL") or raw.get("ollama_url", "https://api.ollama.com"),
+        ollama_model=raw.get("ollama_model", "llama3.1"),
+        ollama_api_key=os.environ.get("OLLAMA_API_KEY") or raw.get("ollama_api_key"),
         # Telegram
         telegram_bot_token=os.environ.get("TELEGRAM_BOT_TOKEN") or raw.get("telegram_bot_token"),
         telegram_chat_ids=os.environ.get("TELEGRAM_CHAT_IDS") or raw.get("telegram_chat_ids", ""),
