@@ -114,8 +114,11 @@ class NasTechBot:
     # ------------------------------------------------------------------
 
     def _is_allowed(self, update: Update) -> bool:
+        # Fail-closed: if no allowlist is configured, deny everything.
+        # This prevents unauthorised access to /sync, /dryrun, and AI
+        # queries when the bot token is accidentally leaked or shared.
         if not self.allowed_chat_ids:
-            return True  # open if no restriction set
+            return False
         chat_id = update.effective_chat.id
         return chat_id in self.allowed_chat_ids
 
@@ -179,6 +182,9 @@ class NasTechBot:
                 and s["last_synced_upstream_sha"] == s["upstream_head"]
             )
             icon = "✅" if up_to_date else "🔄"
+            up_cloned = "✅" if s.get("upstream_cloned") else "❌"
+            dn_cloned = "✅" if s.get("downstream_cloned") else "❌"
+            footer = "✅ Up to date\\!" if up_to_date else "🔄 New upstream commits available\\. Use /sync to update\\."
             text = (
                 f"*NasTech Sync Status* {icon}\n"
                 f"━━━━━━━━━━━━━━━━━━━━━━\n"
@@ -186,9 +192,9 @@ class NasTechBot:
                 f"Last sync time: {_escape(str(lst))}\n"
                 f"Upstream HEAD: `{_escape(uh)}`\n"
                 f"Downstream HEAD: `{_escape(dh)}`\n"
-                f"Upstream cloned: {'✅' if s.get('upstream_cloned') else '❌'}\n"
-                f"Downstream cloned: {'✅' if s.get('downstream_cloned') else '❌'}\n\n"
-                f"{'✅ Up to date\\!' if up_to_date else '🔄 New upstream commits available\\. Use /sync to update\\.'}"
+                f"Upstream cloned: {up_cloned}\n"
+                f"Downstream cloned: {dn_cloned}\n\n"
+                f"{footer}"
             )
             await update.message.reply_text(text, parse_mode=ParseMode.MARKDOWN_V2)
         except Exception as exc:

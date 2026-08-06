@@ -105,15 +105,20 @@ class NasTechScheduler:
                 if x.strip().lstrip("-").isdigit()
             ]
 
-            if tg_token:
+            if not tg_token:
+                logger.warning(
+                    "TELEGRAM_BOT_TOKEN not set — Telegram bot disabled."
+                )
+            elif not chat_ids:
+                logger.warning(
+                    "TELEGRAM_CHAT_IDS not set — Telegram bot disabled. "
+                    "Set TELEGRAM_CHAT_IDS (as a secret) to a comma-separated "
+                    "list of allowed chat IDs before enabling the bot."
+                )
+            else:
                 tasks.append(asyncio.create_task(
                     self._run_telegram(tg_token, chat_ids), name="telegram"
                 ))
-            else:
-                logger.warning(
-                    "TELEGRAM_BOT_TOKEN not set — Telegram bot disabled. "
-                    "Set it in env or config.yaml."
-                )
 
         logger.info("NasTech Sync is live. Press Ctrl+C to stop.")
 

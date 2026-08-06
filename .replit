@@ -34,4 +34,3 @@ externalPort = 80
 [userenv]
 
 [userenv.shared]
-TELEGRAM_CHAT_IDS = "5937459648"
